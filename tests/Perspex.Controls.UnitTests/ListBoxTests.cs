@@ -1,11 +1,10 @@
 ﻿// Copyright (c) The Perspex Project. All rights reserved.
 // Licensed under the MIT license. See licence.md file in the project root for full license information.
 
-using System;
 using System.Linq;
-using Perspex.Controls;
 using Perspex.Controls.Presenters;
 using Perspex.Controls.Templates;
+using Perspex.Input;
 using Perspex.LogicalTree;
 using Perspex.Styling;
 using Xunit;
@@ -31,23 +30,6 @@ namespace Perspex.Controls.UnitTests
             {
                 Assert.IsType<ListBoxItem>(child);
             }
-        }
-
-        [Fact]
-        public void Setting_Item_IsSelected_Sets_ListBox_Selection()
-        {
-            var target = new ListBox
-            {
-                Template = new ControlTemplate(CreateListBoxTemplate),
-                Items = new[] { "Foo", "Bar", "Baz " },
-            };
-
-            target.ApplyTemplate();
-
-            ((ListBoxItem)target.GetLogicalChildren().ElementAt(1)).IsSelected = true;
-
-            Assert.Equal("Bar", target.SelectedItem);
-            Assert.Equal(1, target.SelectedIndex);
         }
 
         [Fact]
@@ -82,6 +64,30 @@ namespace Perspex.Controls.UnitTests
             Assert.Equal(
                 new object[] { items[0], items[1], "Base", "Base" },
                 dataContexts);
+        }
+
+        [Fact]
+        public void Setting_SelectedItem_Should_Set_Panel_Keyboard_Navigation()
+        {
+            var target = new ListBox
+            {
+                Template = new ControlTemplate(CreateListBoxTemplate),
+                Items = new[] { "Foo", "Bar", "Baz " },
+            };
+
+            target.ApplyTemplate();
+
+            target.Presenter.Panel.Children[1].RaiseEvent(new PointerPressEventArgs
+            {
+                RoutedEvent = InputElement.PointerPressedEvent,
+                MouseButton = MouseButton.Left,
+            });
+
+            var panel = target.Presenter.Panel;
+
+            Assert.Equal(
+                KeyboardNavigation.GetTabOnceActiveElement((InputElement)panel),
+                panel.Children[1]);
         }
 
         private Control CreateListBoxTemplate(ITemplatedControl parent)

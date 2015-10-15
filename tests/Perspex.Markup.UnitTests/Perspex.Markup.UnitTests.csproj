@@ -73,6 +73,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Binding\ExpressionNodeBuilderTests_Errors.cs" />
+    <Compile Include="Binding\ExpressionSubjectTests.cs" />
     <Compile Include="Binding\ExpressionObserverTests_Observable.cs" />
     <Compile Include="Binding\ExpressionObserverTests_SetValue.cs" />
     <Compile Include="Binding\ExpressionObserverTests_Task.cs" />
@@ -81,6 +82,7 @@
     <Compile Include="Binding\ExpressionObserverTests_Property.cs" />
     <Compile Include="Binding\ExpressionNodeBuilderTests.cs" />
     <Compile Include="Binding\NotifyingBase.cs" />
+    <Compile Include="DefaultValueConverterTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UnitTestSynchronizationContext.cs" />
   </ItemGroup>
