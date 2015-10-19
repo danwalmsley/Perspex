@@ -82,6 +82,8 @@ namespace Perspex.Controls.Primitives
         private object _selectedItem;
         private IList _selectedItems;
         private bool _ignoreContainerSelectionChanged;
+        private bool _syncingSelectedItems;
+        private IList _clearSelectedItemsAfterDataContextChanged;
 
         /// <summary>
         /// Initializes static members of the <see cref="SelectingItemsControl"/> class.
@@ -139,7 +141,7 @@ namespace Perspex.Controls.Primitives
                 var index = IndexOf(Items, value);
                 var effective = index != -1 ? value : null;
 
-                if (effective != old)
+                if (!object.Equals(effective, old))
                 {
                     _selectedItem = effective;
                     RaisePropertyChanged(SelectedItemProperty, old, effective, BindingPriority.LocalValue);
@@ -149,13 +151,29 @@ namespace Perspex.Controls.Primitives
                     {
                         if (SelectedItems.Count != 1 || SelectedItems[0] != effective)
                         {
+                            _syncingSelectedItems = true;
                             SelectedItems.Clear();
                             SelectedItems.Add(effective);
+                            _syncingSelectedItems = false;
                         }
                     }
                     else if (SelectedItems.Count > 0)
                     {
-                        SelectedItems.Clear();
+                        if (!IsDataContextChanging)
+                        {
+                            SelectedItems.Clear();
+                        }
+                        else
+                        {
+                            // The DataContext is changing, and it's quite possible that our 
+                            // selection is being cleared because both Items and SelectedItems
+                            // are bound to something on the DataContext. However, if we clear
+                            // the collection now, we may be clearing a the SelectedItems from
+                            // the DataContext which is being unbound, so do it after DataContext
+                            // has notified all interested parties, in 
+                            // the OnDataContextFinishedChanging method.
+                            _clearSelectedItemsAfterDataContextChanged = SelectedItems;
+                        }
                     }
                 }
             }
@@ -179,12 +197,9 @@ namespace Perspex.Controls.Primitives
 
             set
             {
-                if (value != null)
-                {
-                    UnsubscribeFromSelectedItems();
-                    _selectedItems = value;
-                    SubscribeToSelectedItems();
-                }
+                UnsubscribeFromSelectedItems();
+                _selectedItems = value ?? new PerspexList<object>();
+                SubscribeToSelectedItems();
             }
         }
 
@@ -269,6 +284,17 @@ namespace Perspex.Controls.Primitives
                     SelectedIndex = IndexOf(e.NewItems, SelectedItem);
                     break;
             }
+        }
+
+        /// <inheritdoc/>
+        protected override void OnDataContextFinishedChanging()
+        {
+            if (_clearSelectedItemsAfterDataContextChanged == SelectedItems)
+            {
+                _clearSelectedItemsAfterDataContextChanged.Clear();
+            }
+
+            _clearSelectedItemsAfterDataContextChanged = null;
         }
 
         /// <summary>
@@ -362,8 +388,8 @@ namespace Perspex.Controls.Primitives
         }
 
         /// <summary>
-        /// Updates the selection based on an event source that may have originated in a container
-        /// that belongs to the control.
+        /// Updates the selection based on an event that may have originated in a container that 
+        /// belongs to the control.
         /// </summary>
         /// <param name="eventSource">The control that raised the event.</param>
         /// <param name="select">Whether the container should be selected or unselected.</param>
@@ -379,11 +405,11 @@ namespace Perspex.Controls.Primitives
             bool rangeModifier = false,
             bool toggleModifier = false)
         {
-            var item = GetContainerFromEventSource(eventSource);
+            var container = GetContainerFromEventSource(eventSource);
 
-            if (item != null)
+            if (container != null)
             {
-                UpdateSelection(item, select, rangeModifier, toggleModifier);
+                UpdateSelection(container, select, rangeModifier, toggleModifier);
                 return true;
             }
 
@@ -639,7 +665,10 @@ namespace Perspex.Controls.Primitives
                 case NotifyCollectionChangedAction.Remove:
                     if (SelectedItems.Count == 0)
                     {
-                        SelectedIndex = -1;
+                        if (!_syncingSelectedItems)
+                        {
+                            SelectedIndex = -1;
+                        }
                     }
                     else
                     {
@@ -657,7 +686,11 @@ namespace Perspex.Controls.Primitives
                         MarkContainerSelected(item, false);
                     }
 
-                    SelectedIndex = -1;
+                    if (!_syncingSelectedItems)
+                    {
+                        SelectedIndex = -1;
+                    }
+
                     SelectedItemsAdded(SelectedItems);
                     break;
 
@@ -672,7 +705,7 @@ namespace Perspex.Controls.Primitives
                         MarkItemSelected(item, true);
                     }
 
-                    if (SelectedItem != SelectedItems[0])
+                    if (SelectedItem != SelectedItems[0] && !_syncingSelectedItems)
                     {
                         var oldItem = SelectedItem;
                         var oldIndex = SelectedIndex;
@@ -701,7 +734,7 @@ namespace Perspex.Controls.Primitives
                     MarkItemSelected(item, true);
                 }
 
-                if (SelectedItem == null)
+                if (SelectedItem == null && !_syncingSelectedItems)
                 {
                     var index = IndexOf(Items, items[0]);
 
